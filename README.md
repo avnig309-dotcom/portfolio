@@ -1,7 +1,7 @@
 # portfolio
 # Personal Portfolio
 
-## A simple responsive portfolio website showcasing my skills, projects, and interests as an AIML student.
+### A simple responsive portfolio website showcasing my skills, projects, and interests as an AIML student.
 
 ### Built With
 
