@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Personal Expense Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EDE6D6;
+    --paper-dark: #E3D9C4;
+    --paper-line: #C9BFA5;
+    --ink: #22201B;
+    --ink-soft: #5B5546;
+    --green: #1F4A3D;
+    --green-dark: #143229;
+    --green-soft: #E4ECE7;
+    --blue: #2E5C8A;
+    --blue-soft: #E7EEF5;
+    --red: #A83E3E;
+    --red-soft: #F5E7E7;
+    --gold: #B08D3E;
+    --card-shadow: 0 1px 0 rgba(34,32,27,0.06), 0 8px 24px rgba(34,32,27,0.08);
+  }
+
+  *{ box-sizing: border-box; }
+
+  html,body{
+    margin:0; padding:0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body{
+    background-image:
+      radial-gradient(ellipse at top left, rgba(31,74,61,0.05), transparent 60%),
+      radial-gradient(ellipse at bottom right, rgba(160,60,60,0.04), transparent 55%);
+  }
+
+  .display{ font-family: 'Special Elite', 'IBM Plex Mono', monospace; }
+  .mono{ font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Layout shell ---------- */
+  .app{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+  }
+
+  /* ---------- Header / receipt ---------- */
+  header.masthead{
+    display:flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 3px double var(--ink);
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .masthead-title .stamp{
+    font-family:'Special Elite', monospace;
+    font-size: 30px;
+    letter-spacing: 3px;
+    color: var(--green-dark);
+  }
+  .masthead-title .sub{
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-top: 2px;
+  }
+  .masthead-actions{ display:flex; gap:8px; }
+  .ghost-btn{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    background: transparent;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 7px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+  }
+  .ghost-btn:hover{ background: var(--ink); color: var(--paper); }
+  input[type="file"]{ display:none; }
+
+  /* ---------- Balance receipt strip ---------- */
+  .receipt{
+    background: var(--green-dark);
+    color: var(--paper);
+    border-radius: 4px;
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 16px;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .receipt::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.02) 0 2px, transparent 2px 10px);
+    pointer-events:none;
+  }
+  .receipt .cell .k{
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.65;
+    margin-bottom: 6px;
+  }
+  .receipt .cell .v{
+    font-size: 26px;
+    font-weight: 600;
+  }
+  .receipt .cell.balance .v{ font-size: 34px; }
+  .receipt .cell.income .v{ color: #9FD6BE; }
+  .receipt .cell.expense .v{ color: #E8AFAF; }
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    display:flex;
+    gap: 4px;
+    margin: 22px 0 0;
+  }
+  nav.tabs button{
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+    letter-spacing: 1px;
+    background: var(--paper-dark);
+    border: 1px solid var(--paper-line);
+    border-bottom: none;
+    color: var(--ink-soft);
+    padding: 10px 18px 8px;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    position: relative;
+    top: 1px;
+  }
+  nav.tabs button.active{
+    background: var(--paper);
+    color: var(--green-dark);
+    border-color: var(--ink);
+    border-bottom: 1px solid var(--paper);
+  }
+
+  .panel{
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 0 6px 6px 6px;
+    padding: 24px;
+    box-shadow: var(--card-shadow);
+  }
+
+  h2.panel-title{
+    font-family:'Special Elite', monospace;
+    font-size: 16px;
+    letter-spacing: 1px;
+    margin: 0 0 18px;
+    color: var(--green-dark);
+  }
+
+  /* ---------- Form ---------- */
+  .form-grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px 20px;
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field.full{ grid-column: 1 / -1; }
+  .field label{
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .field input, .field select{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    padding: 9px 10px;
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    color: var(--ink);
+  }
+  .field input:focus, .field select:focus{
+    outline: 2px solid var(--green);
+    outline-offset: 1px;
+    border-color: var(--green);
+  }
+  .type-toggle{
+    display:flex;
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .type-toggle button{
+    flex:1;
+    padding: 9px 10px;
+    font-family:'IBM Plex Sans';
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    background: #fff;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .type-toggle button.on.income{ background: var(--blue-soft); color: var(--blue); }
+  .type-toggle button.on.expense{ background: var(--red-soft); color: var(--red); }
+
+  .submit-row{ display:flex; justify-content: flex-end; margin-top: 20px; }
+  .primary-btn{
+    font-family: 'Special Elite', monospace;
+    font-size: 14px;
+    letter-spacing: 1px;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    padding: 11px 22px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .primary-btn:hover{ background: var(--green-dark); }
+  .error-msg{
+    font-size: 12px;
+    color: var(--red);
+    margin-top: 10px;
+    min-height: 14px;
+  }
+  .toast{
+    font-size: 12px;
+    color: var(--green-dark);
+    margin-top: 10px;
+    min-height: 14px;
+  }
+
+  /* ---------- Records ---------- */
+  .filters{
+    display:flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .filters input, .filters select{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 7px 9px;
+    border: 1px solid var(--paper-line);
+    border-radius: 4px;
+    background: #fff;
+  }
+  .filters .search{ flex: 1; min-width: 160px; }
+
+  .ledger-sheet{
+    background:
+      linear-gradient(var(--paper) 0, var(--paper) 100%),
+      repeating-linear-gradient(transparent 0, transparent 38px, var(--paper-line) 39px);
+    border-left: 2px solid var(--red);
+    padding-left: 14px;
+    position: relative;
+  }
+  table.ledger{
+    width: 100%;
+    border-collapse: collapse;
+  }
+  table.ledger thead th{
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--ink);
+  }
+  table.ledger tbody td{
+    padding: 9px 8px;
+    font-size: 13px;
+    height: 20px;
+    vertical-align: middle;
+  }
+  table.ledger tbody tr{ height: 39px; }
+  table.ledger td.amt{ text-align: right; }
+  .pill{
+    display:inline-block;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .pill.income{ background: var(--blue-soft); color: var(--blue); }
+  .pill.expense{ background: var(--red-soft); color: var(--red); }
+  .row-actions{ display:flex; gap:6px; }
+  .icon-btn{
+    border:none; background: transparent;
+    cursor:pointer; font-size: 13px;
+    color: var(--ink-soft);
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+  .icon-btn:hover{ background: var(--paper-dark); color: var(--ink); }
+  .empty-state{
+    text-align:center;
+    padding: 40px 10px;
+    color: var(--ink-soft);
+    font-family: 'Special Elite', monospace;
+    font-size: 13px;
+  }
+
+  /* ---------- Stats ---------- */
+  .stat-summary{
+    display:grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+  .stat-card{
+    border: 1px solid var(--paper-line);
+    border-radius: 5px;
+    padding: 14px 16px;
+    background: var(--paper-dark);
+  }
+  .stat-card .k{ font-size: 10px; letter-spacing:1.5px; text-transform:uppercase; color: var(--ink-soft); }
+  .stat-card .v{ font-size: 20px; font-weight: 700; margin-top: 4px; }
+  .stat-card.income .v{ color: var(--blue); }
+  .stat-card.expense .v{ color: var(--red); }
+
+  .bar-row{ margin-bottom: 14px; }
+  .bar-row .bar-label{
+    display:flex; justify-content: space-between;
+    font-size: 12px; margin-bottom: 5px;
+  }
+  .bar-track{
+    height: 14px;
+    background: var(--paper-dark);
+    border: 1px solid var(--paper-line);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill{
+    height: 100%;
+    background: repeating-linear-gradient(45deg, var(--green), var(--green) 6px, var(--green-dark) 6px, var(--green-dark) 12px);
+  }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{
+    position: fixed; inset:0;
+    background: rgba(34,32,27,0.45);
+    display:flex; align-items:center; justify-content:center;
+    z-index: 50;
+  }
+  .modal{
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    padding: 22px;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: var(--card-shadow);
+  }
+  .modal h3{ font-family:'Special Elite', monospace; margin: 0 0 14px; font-size: 15px; }
+  .modal .modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top: 18px; }
+  .text-btn{ background:none; border:none; cursor:pointer; font-size:13px; color: var(--ink-soft); }
+  .danger-btn{
+    background: var(--red); color:#fff; border:none;
+    padding: 9px 16px; border-radius:4px; cursor:pointer; font-size: 13px;
+  }
+
+  footer.foot{
+    text-align:center;
+    margin-top: 40px;
+    font-size: 11px;
+    color: var(--ink-soft);
+    letter-spacing: 0.5px;
+  }
+
+  @media (max-width: 640px){
+    .form-grid{ grid-template-columns: 1fr; }
+    .receipt{ grid-template-columns: 1fr; }
+    .stat-summary{ grid-template-columns: 1fr; }
+    table.ledger thead{ display:none; }
+    table.ledger, table.ledger tbody, table.ledger tr, table.ledger td{ display:block; width:100%; }
+    table.ledger tbody tr{ height:auto; border-bottom:1px solid var(--paper-line); padding: 8px 0; }
+    table.ledger td.amt{ text-align:left; }
+  }
+
+  :focus-visible{ outline: 2px solid var(--green); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="masthead">
+    <div class="masthead-title">
+      <div class="stamp">LEDGER</div>
+      <div class="sub">Personal Expense Tracker</div>
+    </div>
+    <div class="masthead-actions">
+      <button class="ghost-btn" id="exportBtn">Export .json</button>
+      <label class="ghost-btn" for="importInput" style="display:inline-block;">Import .json</label>
+      <input type="file" id="importInput" accept="application/json">
+    </div>
+  </header>
+
+  <section class="receipt">
+    <div class="cell balance">
+      <div class="k">Net Balance</div>
+      <div class="v mono" id="netBalance">$0.00</div>
+    </div>
+    <div class="cell income">
+      <div class="k">Total Income</div>
+      <div class="v mono" id="totalIncome">$0.00</div>
+    </div>
+    <div class="cell expense">
+      <div class="k">Total Expense</div>
+      <div class="v mono" id="totalExpense">$0.00</div>
+    </div>
+  </section>
+
+  <nav class="tabs">
+    <button data-tab="add" class="active">1. Add</button>
+    <button data-tab="records">2. Records</button>
+    <button data-tab="stats">3. Stats</button>
+  </nav>
+
+  <!-- ADD PANEL -->
+  <section class="panel" id="panel-add">
+    <h2 class="panel-title">Add New Transaction</h2>
+    <form id="entryForm">
+      <div class="form-grid">
+        <div class="field full">
+          <label>Type</label>
+          <div class="type-toggle">
+            <button type="button" data-type="Income" id="typeIncomeBtn">Income</button>
+            <button type="button" data-type="Expense" id="typeExpenseBtn">Expense</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="dateInput">
+        </div>
+        <div class="field">
+          <label>Category</label>
+          <select id="categoryInput"></select>
+        </div>
+        <div class="field">
+          <label>Amount</label>
+          <input type="number" id="amountInput" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="field">
+          <label>Description</label>
+          <input type="text" id="descInput" maxlength="50" placeholder="e.g. Grocery run">
+        </div>
+      </div>
+      <div class="error-msg" id="formError"></div>
+      <div class="toast" id="formToast"></div>
+      <div class="submit-row">
+        <button type="submit" class="primary-btn">Save Entry</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- RECORDS PANEL -->
+  <section class="panel" id="panel-records" style="display:none;">
+    <h2 class="panel-title">All Records</h2>
+    <div class="filters">
+      <input type="text" class="search" id="searchInput" placeholder="Search description or category…">
+      <select id="filterType">
+        <option value="">All types</option>
+        <option value="Income">Income</option>
+        <option value="Expense">Expense</option>
+      </select>
+      <input type="date" id="filterFrom" title="From date">
+      <input type="date" id="filterTo" title="To date">
+    </div>
+    <div class="ledger-sheet">
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th>Date</th><th>Type</th><th>Category</th><th>Description</th>
+            <th style="text-align:right;">Amount</th><th style="text-align:right;">Balance</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="recordsBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">— no records yet —</div>
+    </div>
+  </section>
+
+  <!-- STATS PANEL -->
+  <section class="panel" id="panel-stats" style="display:none;">
+    <h2 class="panel-title">Financial Statistics</h2>
+    <div class="stat-summary">
+      <div class="stat-card income">
+        <div class="k">Income</div>
+        <div class="v mono" id="statIncome">$0.00</div>
+      </div>
+      <div class="stat-card expense">
+        <div class="k">Expense</div>
+        <div class="v mono" id="statExpense">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="k">Net Balance</div>
+        <div class="v mono" id="statNet">$0.00</div>
+      </div>
+    </div>
+    <h2 class="panel-title" style="font-size:13px;">Spending Breakdown by Category</h2>
+    <div id="breakdown"></div>
+    <div class="empty-state" id="statsEmpty" style="display:none;">— add an expense to see a breakdown —</div>
+  </section>
+
+  <footer class="foot">Data lives in this browser tab for the session — export a .json backup before you close it.</footer>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-backdrop" id="modalBackdrop" style="display:none;">
+  <div class="modal">
+    <h3>Delete this entry?</h3>
+    <p style="font-size:13px; color: var(--ink-soft);" id="modalText"></p>
+    <div class="modal-actions">
+      <button class="text-btn" id="modalCancel">Cancel</button>
+      <button class="danger-btn" id="modalConfirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const CATEGORIES = ["Food","Travel","Rent","Bills","Entertainment","Salary","Other"];
+
+  // in-memory store, mirrors the struct in the original C program
+  // { id, date: 'YYYY-MM-DD', type: 'Income'|'Expense', category, amount, description }
+  let expenses = [];
+  let nextId = 1;
+  let currentType = "Expense";
+  let editingId = null;
+  let pendingDeleteId = null;
+
+  const $ = (sel) => document.querySelector(sel);
+  const fmt = (n) => "$" + Number(n || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // ---- populate category select ----
+  const categorySelect = $("#categoryInput");
+  CATEGORIES.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c; opt.textContent = c;
+    categorySelect.appendChild(opt);
+  });
+
+  // ---- tabs ----
+  document.querySelectorAll("nav.tabs button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("nav.tabs button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      ["add","records","stats"].forEach(name => {
+        $("#panel-" + name).style.display = (name === btn.dataset.tab) ? "block" : "none";
+      });
+      if (btn.dataset.tab === "records") renderRecords();
+      if (btn.dataset.tab === "stats") renderStats();
+    });
+  });
+
+  // ---- type toggle ----
+  function setType(t){
+    currentType = t;
+    $("#typeIncomeBtn").classList.toggle("on", t === "Income");
+    $("#typeIncomeBtn").classList.toggle("income", t === "Income");
+    $("#typeExpenseBtn").classList.toggle("on", t === "Expense");
+    $("#typeExpenseBtn").classList.toggle("expense", t === "Expense");
+  }
+  $("#typeIncomeBtn").addEventListener("click", () => setType("Income"));
+  $("#typeExpenseBtn").addEventListener("click", () => setType("Expense"));
+  setType("Expense");
+
+  // default date = today
+  $("#dateInput").value = new Date().toISOString().slice(0,10);
+
+  // ---- add / edit submit ----
+  $("#entryForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const dateVal = $("#dateInput").value;
+    const category = $("#categoryInput").value;
+    const amount = parseFloat($("#amountInput").value);
+    const description = $("#descInput").value.trim();
+    const errorEl = $("#formError");
+    const toastEl = $("#formToast");
+    errorEl.textContent = ""; toastEl.textContent = "";
+
+    if (!dateVal){ errorEl.textContent = "Pick a date."; return; }
+    if (isNaN(amount) || amount <= 0){ errorEl.textContent = "Enter an amount greater than 0."; return; }
+    if (!description){ errorEl.textContent = "Add a short description."; return; }
+
+    if (editingId !== null){
+      const rec = expenses.find(x => x.id === editingId);
+      Object.assign(rec, { date: dateVal, type: currentType, category, amount, description });
+      toastEl.textContent = ">> Updated successfully!";
+      editingId = null;
+      $(".primary-btn").textContent = "Save Entry";
+    } else {
+      expenses.push({ id: nextId++, date: dateVal, type: currentType, category, amount, description });
+      toastEl.textContent = ">> Success! Entry saved.";
+    }
+
+    e.target.reset();
+    $("#dateInput").value = new Date().toISOString().slice(0,10);
+    setType("Expense");
+    renderReceipt();
+  });
+
+  // ---- filters ----
+  ["searchInput","filterType","filterFrom","filterTo"].forEach(id => {
+    $("#" + id).addEventListener("input", renderRecords);
+  });
+
+  function filteredExpenses(){
+    const q = $("#searchInput").value.trim().toLowerCase();
+    const type = $("#filterType").value;
+    const from = $("#filterFrom").value;
+    const to = $("#filterTo").value;
+    return expenses
+      .slice()
+      .sort((a,b) => a.date.localeCompare(b.date) || a.id - b.id)
+      .filter(x => {
+        if (type && x.type !== type) return false;
+        if (from && x.date < from) return false;
+        if (to && x.date > to) return false;
+        if (q && !(x.description.toLowerCase().includes(q) || x.category.toLowerCase().includes(q))) return false;
+        return true;
+      });
+  }
+
+  // ---- render records (with running balance, ledger style) ----
+  function renderRecords(){
+    const rows = filteredExpenses();
+    const tbody = $("#recordsBody");
+    tbody.innerHTML = "";
+    $("#emptyState").style.display = rows.length ? "none" : "block";
+
+    let running = 0;
+    // running balance should reflect chronological order regardless of filter,
+    // so compute against the full sorted list, then only print filtered rows
+    const fullSorted = expenses.slice().sort((a,b) => a.date.localeCompare(b.date) || a.id - b.id);
+    const runningMap = new Map();
+    fullSorted.forEach(x => {
+      running += (x.type === "Income" ? x.amount : -x.amount);
+      runningMap.set(x.id, running);
+    });
+
+    rows.forEach(rec => {
+      const tr = document.createElement("tr");
+      const bal = runningMap.get(rec.id);
+      tr.innerHTML = `
+        <td class="mono">${rec.date}</td>
+        <td><span class="pill ${rec.type.toLowerCase()}">${rec.type}</span></td>
+        <td>${escapeHtml(rec.category)}</td>
+        <td>${escapeHtml(rec.description)}</td>
+        <td class="amt mono">${rec.type === "Income" ? "+" : "−"}${fmt(rec.amount)}</td>
+        <td class="amt mono">${fmt(bal)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="icon-btn" data-edit="${rec.id}" title="Edit">✎</button>
+            <button class="icon-btn" data-del="${rec.id}" title="Delete">🗑</button>
+          </div>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll("[data-edit]").forEach(b => b.addEventListener("click", () => startEdit(+b.dataset.edit)));
+    tbody.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => confirmDelete(+b.dataset.del)));
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  function startEdit(id){
+    const rec = expenses.find(x => x.id === id);
+    if (!rec) return;
+    editingId = id;
+    $("#dateInput").value = rec.date;
+    $("#categoryInput").value = rec.category;
+    $("#amountInput").value = rec.amount;
+    $("#descInput").value = rec.description;
+    setType(rec.type);
+    $(".primary-btn").textContent = "Update Entry";
+    document.querySelector('nav.tabs button[data-tab="add"]').click();
+  }
+
+  function confirmDelete(id){
+    const rec = expenses.find(x => x.id === id);
+    if (!rec) return;
+    pendingDeleteId = id;
+    $("#modalText").textContent = `${rec.date} · ${rec.description} · ${fmt(rec.amount)}`;
+    $("#modalBackdrop").style.display = "flex";
+  }
+  $("#modalCancel").addEventListener("click", () => { $("#modalBackdrop").style.display = "none"; pendingDeleteId = null; });
+  $("#modalConfirm").addEventListener("click", () => {
+    expenses = expenses.filter(x => x.id !== pendingDeleteId);
+    $("#modalBackdrop").style.display = "none";
+    pendingDeleteId = null;
+    renderRecords();
+    renderReceipt();
+  });
+
+  // ---- receipt (top strip) ----
+  function totals(){
+    let income = 0, expense = 0;
+    expenses.forEach(x => x.type === "Income" ? income += x.amount : expense += x.amount);
+    return { income, expense, net: income - expense };
+  }
+  function renderReceipt(){
+    const { income, expense, net } = totals();
+    $("#totalIncome").textContent = fmt(income);
+    $("#totalExpense").textContent = fmt(expense);
+    $("#netBalance").textContent = fmt(net);
+  }
+
+  // ---- stats panel ----
+  function renderStats(){
+    const { income, expense, net } = totals();
+    $("#statIncome").textContent = fmt(income);
+    $("#statExpense").textContent = fmt(expense);
+    $("#statNet").textContent = fmt(net);
+
+    const breakdown = $("#breakdown");
+    breakdown.innerHTML = "";
+    if (expense <= 0){
+      $("#statsEmpty").style.display = "block";
+      return;
+    }
+    $("#statsEmpty").style.display = "none";
+
+    const byCategory = {};
+    expenses.filter(x => x.type === "Expense").forEach(x => {
+      byCategory[x.category] = (byCategory[x.category] || 0) + x.amount;
+    });
+    Object.entries(byCategory)
+      .sort((a,b) => b[1]-a[1])
+      .forEach(([cat, total]) => {
+        const pct = (total / expense) * 100;
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        row.innerHTML = `
+          <div class="bar-label">
+            <span>${escapeHtml(cat)}</span>
+            <span class="mono">${fmt(total)} · ${pct.toFixed(1)}%</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%"></div></div>`;
+        breakdown.appendChild(row);
+      });
+  }
+
+  // ---- export / import (stands in for saveData()/loadData() from the C version) ----
+  $("#exportBtn").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify({ expenses, nextId }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "ledger-data.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  $("#importInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const data = JSON.parse(reader.result);
+        if (Array.isArray(data.expenses)){
+          expenses = data.expenses;
+          nextId = data.nextId || (Math.max(0, ...expenses.map(x => x.id)) + 1);
+          renderReceipt(); renderRecords(); renderStats();
+        }
+      } catch(err){ alert("That file doesn't look like a valid ledger export."); }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
+
+  renderReceipt();
+})();
+</script>
+</body>
+</html>
